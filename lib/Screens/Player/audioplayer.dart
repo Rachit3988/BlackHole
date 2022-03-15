@@ -55,6 +55,9 @@ import 'package:rxdart/rxdart.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:proximity_sensor/proximity_sensor.dart';
+import 'package:flutter/foundation.dart' as foundation;
+import 'dart:async';
 
 class PlayScreen extends StatefulWidget {
   final List songsList;
@@ -77,6 +80,8 @@ class PlayScreen extends StatefulWidget {
 }
 
 class _PlayScreenState extends State<PlayScreen> {
+  late StreamSubscription<dynamic> _streamSubscription;
+
   bool fromMiniplayer = false;
   final String preferredQuality = Hive.box('settings')
       .get('streamingQuality', defaultValue: '96 kbps')
@@ -121,8 +126,31 @@ class _PlayScreenState extends State<PlayScreen> {
   }
 
   @override
+  void dipose() {
+    super.dispose();
+    _streamSubscription.cancel();
+  }
+
+  bool _isNear = false;
+
+  Future<void> listenSensor() async {
+    FlutterError.onError = (FlutterErrorDetails details) {
+      if (foundation.kDebugMode) {
+        FlutterError.dumpErrorToConsole(details);
+      }
+    };
+
+    _streamSubscription = ProximitySensor.events.listen((int event) {
+      setState(() {
+        _isNear = (event > 0) ? true : false;
+      });
+    });
+  }
+
+  @override
   void initState() {
     super.initState();
+    listenSensor();
     main();
     response = widget.songsList;
     globalIndex = widget.index;
@@ -307,6 +335,8 @@ class _PlayScreenState extends State<PlayScreen> {
   @override
   Widget build(BuildContext context) {
     BuildContext? scaffoldContext;
+
+    if (_isNear) audioHandler.skipToNext();
 
     return Dismissible(
       direction: DismissDirection.down,
